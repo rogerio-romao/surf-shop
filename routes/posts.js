@@ -13,27 +13,27 @@ router.get('/new', (req, res, next) => {
 
 /* POST posts create /posts */
 router.get('/', (req, res, next) => {
-    res.send('CREATE /posts/new');
+    res.send('CREATE /posts');
 });
 
 /* GET posts show /posts/:id */
 router.get('/:id', (req, res, next) => {
-    res.send('SHOW /posts/new');
+    res.send('SHOW /posts/:id');
 });
 
 /* GET posts edit /posts/:id/edit */
 router.get('/:id/edit', (req, res, next) => {
-    res.send('EDIT /posts/new');
+    res.send('EDIT /posts/:id/edit');
 });
 
 /* PUT posts update /posts/:id */
 router.get('/:id', (req, res, next) => {
-    res.send('UPDATE /posts/new');
+    res.send('UPDATE /posts/:id');
 });
 
 /* DELETE posts destroy /posts/:id */
 router.get('/:id', (req, res, next) => {
-    res.send('DESTROY /posts/new');
+    res.send('DESTROY /posts/:id');
 });
 
 module.exports = router;
