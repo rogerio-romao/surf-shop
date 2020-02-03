@@ -5,11 +5,7 @@ const Schema = mongoose.Schema;
 const UserSchema = new Schema({
     // username and password not added because they will come from passport by default
     email: String,
-    image: String,
-    posts: [{
-        type: Schema.Types.ObjectId,
-        ref: 'Post'
-    }]
+    image: String
 });
 
 UserSchema.plugin(passportLocalMongoose);
