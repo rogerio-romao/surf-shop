@@ -7,7 +7,17 @@ module.exports = {
 
     // Reviews create
     async reviewCreate(req, res, next) {
-
+        // find the post by id
+        let post = await Post.findById(req.params.id);
+        // create the review
+        // req.body.review.author = req.user._id;
+        let review = await Review.create(req.body.review);
+        // assign review to post
+        post.reviews.push(review);
+        // save post & redirect to post
+        post.save();
+        req.session.success = 'Review created successfully!';
+        res.redirect(`/posts/${post.id}`);
     },
 
     // Reviews update
