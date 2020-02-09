@@ -1,9 +1,10 @@
 require('dotenv').config();
 
-const engine = require('ejs-mate');
 const express = require('express');
+const engine = require('ejs-mate');
 const path = require('path');
 const cookieParser = require('cookie-parser');
+const favicon = require('serve-favicon');
 const logger = require('morgan');
 const passport = require('passport');
 const User = require('./models/user');
@@ -37,6 +38,7 @@ app.set('view engine', 'ejs');
 // set public assets directory
 app.use(express.static('public'))
 
+app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
