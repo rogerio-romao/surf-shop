@@ -20,7 +20,7 @@ const reviews = require("./routes/reviews");
 const app = express();
 
 // connect to the database
-mongoose.connect('mongodb://localhost:27017/surf-shop-mapbox', { useNewUrlParser: true, useUnifiedTopology: true });
+mongoose.connect('mongodb://localhost:27017/surf-shop', { useNewUrlParser: true, useUnifiedTopology: true });
 mongoose.set('useCreateIndex', true);
 
 const db = mongoose.connection;
@@ -62,6 +62,11 @@ passport.deserializeUser(User.deserializeUser());
 
 // set local variables middleware
 app.use(function(req, res, next) {
+  req.user = {
+    '_id': '5e40945ee3d23e0eb0a6fcf3',
+    'username': 'rogerio'
+  }
+  res.locals.currentUser = req.user;
   // set default page title
   res.locals.title = 'Surf Shop';
   // set success flash message
