@@ -8,7 +8,14 @@ module.exports = {
     // Reviews create
     async reviewCreate(req, res, next) {
         // find the post by id
-        let post = await Post.findById(req.params.id);
+        let post = await Post.findById(req.params.id).populate('reviews').exec();
+        let hasReviewed = post.reviews.filter(review => {
+            return review.author.equals(req.user._id);
+        }).length;
+        if (hasReviewed) {
+            req.session.error = 'Sorry, only one review per post allowed.';
+            return res.redirect(`/posts/${post.id}`);
+        }
         // create the review
         req.body.review.author = req.user._id;
         let review = await Review.create(req.body.review);
