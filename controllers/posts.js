@@ -42,7 +42,9 @@ module.exports = {
             })
             .send();
         req.body.post.coordinates = response.body.features[0].geometry.coordinates;
-        let post = await Post.create(req.body.post);
+        let post = new Post(req.body.post);
+        post.properties.description = `<strong><a href="/posts/${post._id}">${post.title}</a></strong><p>${post.location}</p><p>${post.description.substring(0, 20)}...</p>`;
+        await post.save();
         req.session.success = 'Post created successfully!';
         res.redirect(`/posts/${post.id}`);
     },
