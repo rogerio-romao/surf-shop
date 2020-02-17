@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -15,4 +16,28 @@
 	</script>
 	<script src='/javascripts/post-show.js'></script>
 </body>
+=======
+
+<html>
+<head>
+<title>View Post</title>
+ <link rel='stylesheet' href='/stylesheets/style.css' />
+<link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet"> 
+<link rel='stylesheet' href='/stylesheets/post-show.css' />
+<script src='https://api.tiles.mapbox.com/mapbox-gl-js/v1.7.0/mapbox-gl.js'></script>
+<link href='https://api.tiles.mapbox.com/mapbox-gl-js/v1.7.0/mapbox-gl.css' rel='stylesheet' />
+<link rel='stylesheet' href='/stylesheets/starability-basic.min.css' />
+<script src="https://kit.fontawesome.com/43abbfcf76.js" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-3.4.1.min.js" integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo=" crossorigin="anonymous"></script>
+</head>
+  <body>
+    <% include ../partials/navbar %>
+    <% include ../partials/flash-messages %>
+    <%- body -%>
+    <script>
+      let post = <%- JSON.stringify(post) %>;
+    </script>
+    <script src="/javascripts/post-show.js"></script>
+  </body>
+>>>>>>> multer-cloudinary
 </html>

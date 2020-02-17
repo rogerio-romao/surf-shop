@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 body {
     margin: 0;
     padding: 0;
@@ -9,12 +10,21 @@ body {
 }
 
 .marker {
+=======
+  #map {
+    width: 350;
+    height: 200;
+  }
+
+  .marker {
+>>>>>>> multer-cloudinary
     background-image: url('/images/mapbox-icon.png');
     background-size: cover;
     width: 50px;
     height: 50px;
     border-radius: 50%;
     cursor: pointer;
+<<<<<<< HEAD
 }
 
 .mapboxgl-popup {
@@ -25,3 +35,24 @@ body {
     text-align: center;
     font-family: 'Open Sans', sans-serif;
 }
+=======
+  }
+
+  .mapboxgl-popup {
+    max-width: 200px;
+  }
+
+  .mapboxgl-popup-content {
+    text-align: center;
+    font-family: 'Open Sans', sans-serif;
+  }
+
+  .edit-review-form {
+    display: none;
+  }
+
+  .clear-rating {
+    display: block;
+  }
+  
+>>>>>>> multer-cloudinary

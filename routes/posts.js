@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const upload = multer({ 'dest': 'uploads/' });
+const { cloudinary, storage } = require('../cloudinary');
+const upload = multer({ storage });
 const { asyncErrorHandler } = require('../middleware');
 const {
     postIndex,
@@ -35,14 +36,3 @@ router.put('/:id', upload.array('images', 4), asyncErrorHandler(postUpdate));
 router.delete('/:id', asyncErrorHandler(postDestroy));
 
 module.exports = router;
-
-
-// RESTFUL Routes
-
-// GET Index       /posts
-// GET New         /posts/new
-// POST Create     /posts
-// GET Show        /posts/:id
-// GET Edit        /posts/:id/edit
-// PUT Update      /posts/:id
-// DELETE Destroy  /posts/:id

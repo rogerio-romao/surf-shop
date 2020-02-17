@@ -1,4 +1,15 @@
 <% layout('layouts/boilerplate') -%>
 <h1><%= title %></h1>
 <p>Welcome to <%= title %></p>
+<<<<<<< HEAD
 
+=======
+<div id='map'></div>
+
+<script>
+	mapboxgl.accessToken = "<%= mapBoxToken %>";
+	var posts = {features: <%- JSON.stringify(posts) %>};
+</script>
+<script src="/javascripts/allPostsClusterMap.js"></script>
+  
+>>>>>>> multer-cloudinary
