@@ -10,6 +10,11 @@ module.exports = {
         res.render('index', { posts, mapBoxToken, title: 'Surf Shop - Home' });
     },
 
+    // GET /register
+    getRegister(req, res, next) {
+        res.render('register', { title: 'Register' });
+    },
+
     // POST /register
     async postRegister(req, res, next) {
         const newUser = new User({
@@ -18,8 +23,18 @@ module.exports = {
             image: req.body.images
         });
 
-        await User.register(newUser, req.body.password);
-        res.redirect('/');
+        let user = await User.register(newUser, req.body.password);
+        req.login(user, function(err) {
+            if (err) return next(err);
+            req.session.success = `Welcome to Surf Shop, ${user.username}!`;
+            res.redirect('/');
+        });
+
+    },
+
+    // GET /login
+    getLogin(req, res, next) {
+        res.render('login', { title: 'Login' });
     },
 
     // POST /login
