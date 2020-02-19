@@ -1,215 +1,198 @@
-# Continue User Authentication and Authorization
+# Continue User Authentication and Authorization Pt3.
 
-## Update Register and Login
-- Comment out the req.user object assignment in app.js where you're setting a user to always be logged in:
-```JS
-// req.user = {
-//   // '_id' : '5bb27cd1f986d278582aa58c',
-//   // '_id' : '5bc521c0b142b6d7f7523406',
-//   '_id' : '5bfed10ad176f845e38aec92',
-//   'username' : 'ian3'
-// }
-```
-- Add a getRegister method to /controllers/index.js right before existing postRegister method
-```JS
-// GET /register
-getRegister(req, res, next) {
-	res.render('register', { title: 'Register' });
-},
-```
-- Add getLogin method to /controllers/index.js right before existing postLogin method
-```JS
-// GET /login
-getLogin(req, res, next) {
-	res.render('login', { title: 'Login' });
-},
-```
-- Update postRegister method inside of /controllers/index.js
+## Re-seed the database
 
-Replace:
-```JS
-async postRegister(req, res, next) {
-	const newUser = new User({
-		username: req.body.username,
-		email: req.body.email,
-		image: req.body.image
-	});
+### File: /seeds.js
 
-	await User.register(newUser, req.body.password);
-	res.redirect('/');
-},
-```
-with:
+Change:
 ```JS
-async postRegister(req, res, next) {
-	const newUser = new User({
-		username: req.body.username,
-		email: req.body.email,
-		image: req.body.image
-	});
-
-	let user = await User.register(newUser, req.body.password);
-	req.login(user, function(err) {
-	  if (err) { return next(err); }
-	  req.session.success = `Welcome to Surf Shop, ${newUser.username}!`;
-	  res.redirect('/');
-	});
-},
-```
-- Add getRegister and getLogin methods to /routes/index.js
-
-Replace:
-```JS
-const { landingPage, postRegister, postLogin, getLogout } = require('../controllers');
-```
-with:
-```JS
-const { landingPage, getRegister, postRegister, getLogin, postLogin, getLogout } = require('../controllers');
-```
-Replace:
-```JS
-router.get('/register', (req, res, next) => {
-  res.send('GET /register');
-});
-```
-with:
-```JS
-router.get('/register', getRegister);
-```
-Replace:
-```JS
-router.get('/login', (req, res, next) => {
-  res.send('GET /login');
-});
-```
-with:
-```JS
-router.get('/login', getLogin);
-```
-
-## Create Register and Login Views
-- Create a new file inside of /views named register.ejs
-- Add the following markup to it:
-```HTML
-<% layout('layouts/boilerplate') -%>
-
-<form action="/register" method="POST">
-	<div>
-		<label for="username">Username:</label>
-		<input type="text" id="username" name="username" placeholder="username" required>
-	</div>
-	<div>
-		<label for="password">Password:</label>
-		<input type="password" id="password" name="password" placeholder="password" required>
-	</div>
-	<div>
-		<label for="email">Email:</label>
-		<input type="email" id="email" name="email" placeholder="email" required>
-	</div>
-	<div>
-		<label for="image">Image:</label>
-		<input type="file" id="image" name="image">
-	</div>
-	
-	<input type="submit">
-</form>
-```
-- Create a new file inside of /views named login.ejs
-- Add the following markup to it:
-```HTML
-<% layout('layouts/boilerplate') -%>
-
-<form action="/login" method="POST">
-	<div>
-		<label for="username">Username:</label>
-		<input type="text" id="username" name="username" placeholder="username" required>
-	</div>
-	<div>
-		<label for="password">Password:</label>
-		<input type="password" id="password" name="password" placeholder="password" required>
-	</div>
-	
-	<input type="submit">
-</form>
-```
-
-## Update navbar partial
-- Replace entire /views/partials/navbar.ejs file with:
-```HTML
-<style>
-	ul {
-	  list-style-type: none;
-	  margin: 0;
-	  padding: 0;
-	}
-	li {
-	  display: inline;
-	  padding: 5px;
-	}
-</style>
-<ul>
-	<li><a href="/">Home</a></li>
-	<li><a href="/posts">Posts</a></li>
-	<% if(!currentUser) { %>
-		<li><a href="/register">Register</a></li>
-		<li><a href="/login">Login</a></li>
-	<% } else { %>
-		<li><a href="/posts/new">New Post</a></li>
-		<li><a href="/logout">Logout</a></li>
-		Welcome, <%= currentUser.username %>!
-	<% } %>
-</ul>
-```
-
-## Enforce Unique Emails
-- Replace entire /middleware/index.js file with:
-```JS
-const Review = require('../models/review');
-const User = require('../models/user');
-
-module.exports = {
-	asyncErrorHandler: (fn) =>
-		(req, res, next) => {
-			Promise.resolve(fn(req, res, next))
-						 .catch(next);
-		},
-	isReviewAuthor: async (req, res, next) => {
-		let review = await Review.findById(req.params.review_id);
-		if(review.author.equals(req.user._id)) {
-			return next();
-		}
-		req.session.error = 'Bye bye';
-		return res.redirect('/');
-	},
-	checkIfUserExists: async (req, res, next) => {
-		let userExists = await User.findOne({'email': req.body.email});
-		if(userExists) {
-			req.session.error = 'A user with the given email is already registered';
-			return res.redirect('back');
-		}
-		next();
-	}
+      author: {
+  '_id' : '5bb27cd1f986d278582aa58c',
+  'username' : 'ian'
 }
 ```
-- Update middleware in /routes/index.js
+to:
+```JS
+author: '5bb27cd1f986d278582aa58c'
+```
+*\*your id and username will be different*
+### File: /app.js
 
-Replace:
+Uncomment:
 ```JS
-const { asyncErrorHandler } = require('../middleware')
+// const seedPosts = require('./seeds');
+// seedPosts();
 ```
-with:
+in app.js, run the app one time to re-seed the database, then comment it back out.
+
+## Create isAuthor middleware
+
+### File: /middleware/index.js
+
+Add: 
 ```JS
-const { asyncErrorHandler, checkIfUserExists } = require('../middleware')
+const Post = require('../models/post');
+```
+to the top of the file, along with the other existing Review and User model
+
+Add the following middleware after the existing isLoggedIn middleware:
+```JS
+,
+	isAuthor: async (req, res, next) => {
+		let post = await Post.findById(req.params.id);
+		console.log(post);
+		if (post.author.equals(req.user._id)) {
+			res.locals.post = post;
+			return next();
+		}
+		req.session.error = 'Access denied!';
+		res.redirect('back');
+	}
 ```
 
-Replace:
+### File: /controllers/posts.js
+
+Inside of the postCreate method, right after:
 ```JS
-router.post('/register', asyncErrorHandler(postRegister));
+req.body.post.geometry = response.body.features[0].geometry;
 ```
-with:
+add the following: 
 ```JS
-router.post('/register', asyncErrorHandler(checkIfUserExists), asyncErrorHandler(postRegister));
+req.body.post.author = req.user._id;
 ```
 
-## Add Authorization Middleware
-- Still needs to be done...
+Change:
+```JS
+async postEdit(req, res, next) {
+  let post = await Post.findById(req.params.id);
+  res.render('posts/edit', { post });
+},
+```
+to:
+```JS
+postEdit(req, res, next) {
+	res.render('posts/edit');
+},
+```
+
+Change:
+```JS
+async postUpdate(req, res, next) {
+  // find the post by id
+  let post = await Post.findById(req.params.id);
+```
+to:
+```JS
+async postUpdate(req, res, next) {
+	// pull post from res.locals
+	const { post } = res.locals;
+```
+
+Change:
+```JS
+async postDestroy(req, res, next) {
+  let post = await Post.findById(req.params.id);
+```
+to:
+```JS
+async postDestroy(req, res, next) {
+	// pull post from res.locals
+	const { post } = res.locals;
+```
+
+## Add isAuthor middleware to post routes
+
+### File: /routes/posts.js
+
+Change:
+```JS
+const { asyncErrorHandler, isLoggedIn } = require('../middleware');
+```
+to:
+```JS
+const { asyncErrorHandler, isLoggedIn, isAuthor } = require('../middleware');
+```
+
+Change:
+```JS
+router.get('/:id/edit', asyncErrorHandler(postEdit));
+```
+to:
+```JS
+router.get('/:id/edit', isLoggedIn, asyncErrorHandler(isAuthor), postEdit);
+```
+
+Change:
+```JS
+router.put('/:id', upload.array('images', 4), asyncErrorHandler(postUpdate));
+```
+to:
+```JS
+router.put('/:id', isLoggedIn, asyncErrorHandler(isAuthor), upload.array('images', 4), asyncErrorHandler(postUpdate));
+```
+
+Change:
+```JS
+router.delete('/:id', asyncErrorHandler(postDestroy));
+```
+to:
+```JS
+router.delete('/:id', isLoggedIn, asyncErrorHandler(isAuthor), asyncErrorHandler(postDestroy));
+```
+
+## Update GET '/login' route's getLogin method so that logged in users are redirected to the home page
+
+### File: /controllers/index.js
+
+Change:
+```JS
+getLogin(req, res, next) {
+  res.render('login', { title: 'Login' });
+},
+```
+to:
+```JS
+getLogin(req, res, next) {
+  if (req.isAuthenticated()) return res.redirect('/');
+  res.render('login', { title: 'Login' });
+},
+```
+
+## Hide edit and delete buttons from users who are not author of post
+
+### File: /views/posts/show.ejs
+
+Change:
+```HTML
+<div>
+	<a href="/posts/<%= post.id %>/edit">
+		<button>Edit</button>
+	</a>
+</div>
+<div>
+	<form action="/posts/<%= post.id %>?_method=DELETE" method="POST">
+		<input type="submit" value="Delete">
+	</form>
+</div>
+```
+to:
+```HTML
+<% if (currentUser && post.author.equals(currentUser._id)) { %>
+<div>
+	<a href="/posts/<%= post.id %>/edit">
+		<button>Edit</button>
+	</a>
+</div>
+<div>
+	<form action="/posts/<%= post.id %>?_method=DELETE" method="POST">
+		<input type="submit" value="Delete">
+	</form>
+</div>
+<% } %>
+```
+
+## Testing it all out
+
+- Log in and create a new post then ensure that you can edit and delete it
+- Try to visit edit route for an existing post that you did not create (while logged out and while logged in)
+- Try to send delete request a post that you didn't create with curl e.g., `curl -X "DELETE" http://localhost:3000/posts/5c48b91de3c8f61bed99cb76` then check on the post to see if it was deleted
