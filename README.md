@@ -1,76 +1,198 @@
-# Remove Local Image Storage
+# Continue User Authentication and Authorization Pt3.
 
-## Delete /uploads directory from app's root directory
-- Navigate to root directory of surf-shop app in your terminal and run `rm -rf ./uploads`
+## Re-seed the database
 
-## Install multer-storage-cloudinary
-- `npm i -S multer-storage-cloudinary`
+### File: /seeds.js
 
-## Configure Cloudinary and Storage
-- Create a folder named `cloudinary` in the app's root directory
-- Create an `index.js` file inside of the new /cloudinary directory
-- Add the following code to the /cloudinary/index.js file and save it:
+Change:
 ```JS
-const crypto = require('crypto');
-const cloudinary = require('cloudinary');
-cloudinary.config({
-	cloud_name: 'YOUR-CLOUD-NAME-HERE',
-	api_key: 'YOUR-API-KEY-HERE',
-	api_secret: process.env.CLOUDINARY_SECRET
-});
-const cloudinaryStorage = require('multer-storage-cloudinary');
-const storage = cloudinaryStorage({
-  cloudinary: cloudinary,
-  folder: 'surf-shop',
-  allowedFormats: ['jpeg', 'jpg', 'png'],
-  filename: function (req, file, cb) {
-  	let buf = crypto.randomBytes(16);
-  	buf = buf.toString('hex');
-  	let uniqFileName = file.originalname.replace(/\.jpeg|\.jpg|\.png/ig, '');
-  	uniqFileName += buf;
-    cb(undefined, uniqFileName );
-  }
-});
-
-module.exports = {
-	cloudinary,
-	storage
-}
-```
-- Be sure to change cloud_name and api_key values (they're currently located in your `/controllers/posts.js` file)
-
-## Update /routes/posts.js
-- Remove: `const upload = multer({'dest': 'uploads/'});`
-- Add: `const { cloudinary, storage } = require('../cloudinary');`
-- Add: `const upload = multer({ storage });`
-
-## /controllers/posts.js
-- Remove: 
-```JS
-const cloudinary = require('cloudinary');
-cloudinary.config({
-      cloud_name: 'devsprout',
-      api_key: '111963319915549',
-      api_secret: process.env.CLOUDINARY_SECRET
-});
-```
-- Add: `const { cloudinary } = require('../cloudinary');`
-- Inside both the `postCreate` and `postUpdate` methods, change:
-```JS
-for(const file of req.files) {
-	let image = await cloudinary.v2.uploader.upload(file.path);
-	req.body.post.images.push({
-		url: image.secure_url,
-		public_id: image.public_id
-	});
+      author: {
+  '_id' : '5bb27cd1f986d278582aa58c',
+  'username' : 'ian'
 }
 ```
 to:
 ```JS
-for(const file of req.files) {
-	req.body.post.images.push({
-		url: file.secure_url,
-		public_id: file.public_id
-	});
-}
+author: '5bb27cd1f986d278582aa58c'
 ```
+*\*your id and username will be different*
+### File: /app.js
+
+Uncomment:
+```JS
+// const seedPosts = require('./seeds');
+// seedPosts();
+```
+in app.js, run the app one time to re-seed the database, then comment it back out.
+
+## Create isAuthor middleware
+
+### File: /middleware/index.js
+
+Add: 
+```JS
+const Post = require('../models/post');
+```
+to the top of the file, along with the other existing Review and User model
+
+Add the following middleware after the existing isLoggedIn middleware:
+```JS
+,
+	isAuthor: async (req, res, next) => {
+		let post = await Post.findById(req.params.id);
+		console.log(post);
+		if (post.author.equals(req.user._id)) {
+			res.locals.post = post;
+			return next();
+		}
+		req.session.error = 'Access denied!';
+		res.redirect('back');
+	}
+```
+
+### File: /controllers/posts.js
+
+Inside of the postCreate method, right after:
+```JS
+req.body.post.geometry = response.body.features[0].geometry;
+```
+add the following: 
+```JS
+req.body.post.author = req.user._id;
+```
+
+Change:
+```JS
+async postEdit(req, res, next) {
+  let post = await Post.findById(req.params.id);
+  res.render('posts/edit', { post });
+},
+```
+to:
+```JS
+postEdit(req, res, next) {
+	res.render('posts/edit');
+},
+```
+
+Change:
+```JS
+async postUpdate(req, res, next) {
+  // find the post by id
+  let post = await Post.findById(req.params.id);
+```
+to:
+```JS
+async postUpdate(req, res, next) {
+	// pull post from res.locals
+	const { post } = res.locals;
+```
+
+Change:
+```JS
+async postDestroy(req, res, next) {
+  let post = await Post.findById(req.params.id);
+```
+to:
+```JS
+async postDestroy(req, res, next) {
+	// pull post from res.locals
+	const { post } = res.locals;
+```
+
+## Add isAuthor middleware to post routes
+
+### File: /routes/posts.js
+
+Change:
+```JS
+const { asyncErrorHandler, isLoggedIn } = require('../middleware');
+```
+to:
+```JS
+const { asyncErrorHandler, isLoggedIn, isAuthor } = require('../middleware');
+```
+
+Change:
+```JS
+router.get('/:id/edit', asyncErrorHandler(postEdit));
+```
+to:
+```JS
+router.get('/:id/edit', isLoggedIn, asyncErrorHandler(isAuthor), postEdit);
+```
+
+Change:
+```JS
+router.put('/:id', upload.array('images', 4), asyncErrorHandler(postUpdate));
+```
+to:
+```JS
+router.put('/:id', isLoggedIn, asyncErrorHandler(isAuthor), upload.array('images', 4), asyncErrorHandler(postUpdate));
+```
+
+Change:
+```JS
+router.delete('/:id', asyncErrorHandler(postDestroy));
+```
+to:
+```JS
+router.delete('/:id', isLoggedIn, asyncErrorHandler(isAuthor), asyncErrorHandler(postDestroy));
+```
+
+## Update GET '/login' route's getLogin method so that logged in users are redirected to the home page
+
+### File: /controllers/index.js
+
+Change:
+```JS
+getLogin(req, res, next) {
+  res.render('login', { title: 'Login' });
+},
+```
+to:
+```JS
+getLogin(req, res, next) {
+  if (req.isAuthenticated()) return res.redirect('/');
+  res.render('login', { title: 'Login' });
+},
+```
+
+## Hide edit and delete buttons from users who are not author of post
+
+### File: /views/posts/show.ejs
+
+Change:
+```HTML
+<div>
+	<a href="/posts/<%= post.id %>/edit">
+		<button>Edit</button>
+	</a>
+</div>
+<div>
+	<form action="/posts/<%= post.id %>?_method=DELETE" method="POST">
+		<input type="submit" value="Delete">
+	</form>
+</div>
+```
+to:
+```HTML
+<% if (currentUser && post.author.equals(currentUser._id)) { %>
+<div>
+	<a href="/posts/<%= post.id %>/edit">
+		<button>Edit</button>
+	</a>
+</div>
+<div>
+	<form action="/posts/<%= post.id %>?_method=DELETE" method="POST">
+		<input type="submit" value="Delete">
+	</form>
+</div>
+<% } %>
+```
+
+## Testing it all out
+
+- Log in and create a new post then ensure that you can edit and delete it
+- Try to visit edit route for an existing post that you did not create (while logged out and while logged in)
+- Try to send delete request a post that you didn't create with curl e.g., `curl -X "DELETE" http://localhost:3000/posts/5c48b91de3c8f61bed99cb76` then check on the post to see if it was deleted

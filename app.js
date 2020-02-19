@@ -41,7 +41,7 @@ app.set('view engine', 'ejs');
 // set public assets directory
 app.use(express.static('public'))
 
-app.use(favicon(path.join(__dirname, 'public/images', 'favicon.ico')));
+app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -65,14 +65,14 @@ passport.deserializeUser(User.deserializeUser());
 
 // set local variables middleware
 app.use(function(req, res, next) {
-  req.user = {
-    '_id': '5e40945ee3d23e0eb0a6fcf3',
-    'username': 'rogerio'
-    // '_id': '5e42caf625443a0f9245b554',
-    // 'username': 'test'
-    // '_id': '5e46e746c11f8c12781960fa',
-    // 'username': 'test2'
-  }
+  // req.user = {
+  //   '_id': '5e40945ee3d23e0eb0a6fcf3',
+  //   'username': 'rogerio'
+  //   // '_id': '5e42caf625443a0f9245b554',
+  //   // 'username': 'test'
+  //   // '_id': '5e46e746c11f8c12781960fa',
+  //   // 'username': 'test2'
+  // }
   res.locals.currentUser = req.user;
   // set default page title
   res.locals.title = 'Surf Shop';
