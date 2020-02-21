@@ -106,7 +106,7 @@ module.exports = {
         post.price = req.body.post.price;
         post.properties.description = `<strong><a href="/posts/${post._id}">${post.title}</a></strong><p>${post.location}</p><p>${post.description.substring(0, 20)}...</p>`;
         //save to db then redirect
-        post.save();
+        await post.save();
         res.redirect(`/posts/${post.id}`);
     },
 
