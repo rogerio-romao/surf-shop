@@ -1,198 +1,307 @@
-# Continue User Authentication and Authorization Pt3.
+# User Profile Pt. 2 - 4
 
-## Re-seed the database
+## Update flash messages partial
 
-### File: /seeds.js
+### File: /views/partials/flash-messages.ejs
 
 Change:
-```JS
-      author: {
-  '_id' : '5bb27cd1f986d278582aa58c',
-  'username' : 'ian'
-}
+```HTML
+<% if(success && success.length) { %>
+	<h1 style="color: green;"><%= success %></h1>
+<% } %>
+
+<% if(error && error.length) { %>
+	<h1 style="color: red;"><%= error %></h1>
+<% } %>
 ```
 to:
-```JS
-author: '5bb27cd1f986d278582aa58c'
-```
-*\*your id and username will be different*
-### File: /app.js
+```HTML
+<% if(success && success.length) { %>
+	<h1 class="color-green"><%= success %></h1>
+<% } %>
 
-Uncomment:
-```JS
-// const seedPosts = require('./seeds');
-// seedPosts();
+<% if(error && error.length) { %>
+	<h1 class="color-red"><%= error %></h1>
+<% } %>
 ```
-in app.js, run the app one time to re-seed the database, then comment it back out.
 
-## Create isAuthor middleware
+## Add classes to main stylesheet
+
+### File: /public/stylesheets/style.css
+
+Add:
+```CSS
+.color-red {
+	color: red;
+}
+.color-green {
+	color: green;
+}
+```
+## Add profile link to navbar
+
+### File: /views/partials/navbar.ejs
+
+Change:
+```HTML
+<ul>
+	<li><a href="/">Home</a></li>
+	<li><a href="/posts">Posts</a></li>
+	<% if(!currentUser) { %>
+	<li><a href="/register">Register</a></li>
+	<li><a href="/login">Login</a></li>
+	<% } else { %>
+	<li><a href="/posts/new">New Post</a></li>
+	<li><a href="/logout">Logout</a></li>
+	Welcome, <%= currentUser.username %>!
+	<% } %>
+</ul>
+```
+to:
+```HTML
+<ul id="navbar">
+	<li><a href="/">Home</a></li>
+	<li><a href="/posts">Posts</a></li>
+	<% if(!currentUser) { %>
+	<li><a href="/register">Register</a></li>
+	<li><a href="/login">Login</a></li>
+	<% } else { %>
+	<li><a href="/posts/new">New Post</a></li>
+	<li><a href="/profile">Profile</a></li>
+	<li><a href="/logout">Logout</a></li>
+	Welcome, <%= currentUser.username %>!
+	<% } %>
+</ul>
+```
+
+## Add update form to profile
+
+### File: /views/profile.ejs
+
+Add the following code to the bottom of the file:
+```HTML
+<p>Update Info:</p>
+
+<form action="/profile?_method=PUT" method="POST" id="update-profile">
+	<div>
+		<label for="username">Username:</label>
+		<input type="text" id="username" name="username" placeholder="username" value="<%= currentUser.username %>" autofocus required>
+	</div>
+	<div>
+		<label for="current-password">Current Password (required to update profile):</label>
+		<input type="password" id="current-password" name="currentPassword" placeholder="current password" required>
+	</div>
+	<div>
+		<label for="new-password">New Password:</label>
+		<input type="password" id="new-password" name="newPassword" placeholder="new password">
+	</div>
+	<div>
+		<label for="password-confirmation">New Password Confirmation:</label>
+		<input type="password" id="password-confirmation" name="passwordConfirmation" placeholder="password confirmation">
+	</div>
+	<div id="validation-message"></div>
+	<div>
+		<label for="email">Email:</label>
+		<input type="email" id="email" name="email" placeholder="email" value="<%= currentUser.email %>" required>
+	</div>
+	<div>
+		<label for="image">Image:</label>
+		<input type="file" id="image" name="image">
+	</div>
+
+	<input type="submit">
+</form>
+
+<script src="/javascripts/profile.js"></script>
+```
+
+## Create profile.js file
+
+### Create a file named profile.js inside of /public/javascripts
+
+Add:
+```JS
+let newPasswordValue;
+let confirmationValue;
+const form = document.querySelector('form');
+const newPassword = document.getElementById('new-password');
+const confirmation = document.getElementById('password-confirmation');
+const validationMessage = document.getElementById('validation-message');
+function validatePasswords(message, add, remove) {
+		validationMessage.textContent = message;
+		validationMessage.classList.add(add);
+		validationMessage.classList.remove(remove);
+}
+confirmation.addEventListener('input', e => {
+	e.preventDefault();
+	newPasswordValue = newPassword.value;
+	confirmationValue = confirmation.value;
+	if (newPasswordValue !== confirmationValue) {
+	  validatePasswords('Passwords must match!', 'color-red', 'color-green');
+	} else {
+		validatePasswords('Passwords match!', 'color-green', 'color-red');
+	}
+});
+
+form.addEventListener('submit', e => {
+	if (newPasswordValue !== confirmationValue) { 
+		e.preventDefault();
+		const error = document.getElementById('error');
+		if(!error) {
+			const flashErrorH1 = document.createElement('h1');
+			flashErrorH1.classList.add('color-red');
+			flashErrorH1.setAttribute('id', 'error');
+			flashErrorH1.textContent = 'Passwords must match!';
+			const navbar = document.getElementById('navbar');
+			navbar.parentNode.insertBefore(flashErrorH1, navbar.nextSibling);
+		}
+	}
+});
+```
+
+## Add isValidPassword and changePassword middleware
 
 ### File: /middleware/index.js
 
-Add: 
-```JS
-const Post = require('../models/post');
-```
-to the top of the file, along with the other existing Review and User model
-
-Add the following middleware after the existing isLoggedIn middleware:
+Add the following code to the bottom of the module.exports object after the isAuthor method:
 ```JS
 ,
-	isAuthor: async (req, res, next) => {
-		let post = await Post.findById(req.params.id);
-		console.log(post);
-		if (post.author.equals(req.user._id)) {
-			res.locals.post = post;
-			return next();
+	isValidPassword: async (req, res, next) => {
+		const { user } = await User.authenticate()(req.user.username, req.body.currentPassword)
+		if(user) { 
+			// add user to res.locals
+			res.locals.user = user;
+			// go to next middleware
+			next();
+		} else {
+			// flash an error
+			req.session.error = 'Incorrect Current Password!';
+			// short circuit the route middleware and redirect to /profile
+			return res.redirect('/profile');
 		}
-		req.session.error = 'Access denied!';
-		res.redirect('back');
+	},
+	changePassword: async (req, res, next) => {
+		// destructure new password values from req.body object
+		const { 
+			newPassword,
+			passwordConfirmation
+		} = req.body;
+
+		// check if new password values exist
+		if (newPassword && passwordConfirmation) {
+			// destructure user from res.locals
+			const { user } = res.locals;
+				// check if new passwords match
+				if (newPassword === passwordConfirmation) {
+					// set new password on user object
+					await user.setPassword(newPassword);
+					// go to next middleware
+					next();
+				} else {
+					// flash error
+					req.session.error = 'New passwords must match!';
+					// short circuit the route middleware and redirect to /profile
+					return res.redirect('/profile');
+				}
+		} else {
+			// go to next middleware
+			next();
+		}
 	}
 ```
 
-### File: /controllers/posts.js
+## Add updateProfile method to index controller
 
-Inside of the postCreate method, right after:
+### File: /controllers/index.js
+
+Add the following code to the top of the file after the existing require() statements:
 ```JS
-req.body.post.geometry = response.body.features[0].geometry;
+const util = require('util');
 ```
-add the following: 
+
+Add the following code after the getProfile method:
 ```JS
-req.body.post.author = req.user._id;
+,
+	async updateProfile(req, res, next) {
+		// destructure username and email from req.body
+		const {
+			username,
+			email
+		} = req.body;
+		// destructure user object from res.locals
+		const { user } = res.locals;
+		// check if username or email need to be updated
+		if (username) user.username = username;
+		if (email) user.email = email;
+		// save the updated user to the database
+		await user.save();
+		// promsify req.login
+		const login = util.promisify(req.login.bind(req));
+		// log the user back in with new info
+		await login(user);
+		// redirect to /profile with a success flash message
+		req.session.success = 'Profile successfully updated!';
+		res.redirect('/profile');
+	}
 ```
+
+## Update Routes
+
+### /routes/index.js
 
 Change:
 ```JS
-async postEdit(req, res, next) {
-  let post = await Post.findById(req.params.id);
-  res.render('posts/edit', { post });
-},
+const { 
+	landingPage,
+	getRegister,
+	postRegister,
+	getLogin,
+	postLogin,
+	getLogout,
+	getProfile
+} = require('../controllers');
 ```
 to:
 ```JS
-postEdit(req, res, next) {
-	res.render('posts/edit');
-},
+const { 
+	landingPage,
+	getRegister,
+	postRegister,
+	getLogin,
+	postLogin,
+	getLogout,
+	getProfile,
+	updateProfile
+} = require('../controllers');
 ```
-
-Change:
-```JS
-async postUpdate(req, res, next) {
-  // find the post by id
-  let post = await Post.findById(req.params.id);
-```
-to:
-```JS
-async postUpdate(req, res, next) {
-	// pull post from res.locals
-	const { post } = res.locals;
-```
-
-Change:
-```JS
-async postDestroy(req, res, next) {
-  let post = await Post.findById(req.params.id);
-```
-to:
-```JS
-async postDestroy(req, res, next) {
-	// pull post from res.locals
-	const { post } = res.locals;
-```
-
-## Add isAuthor middleware to post routes
-
-### File: /routes/posts.js
-
 Change:
 ```JS
 const { asyncErrorHandler, isLoggedIn } = require('../middleware');
 ```
 to:
 ```JS
-const { asyncErrorHandler, isLoggedIn, isAuthor } = require('../middleware');
+const { 
+	asyncErrorHandler,
+	isLoggedIn,
+	isValidPassword,
+	changePassword
+} = require('../middleware');
 ```
 
 Change:
 ```JS
-router.get('/:id/edit', asyncErrorHandler(postEdit));
+/* PUT /profile/:user_id */
+router.put('/profile/:user_id', (req, res, next) => {
+  res.send('PUT /profile/:user_id');
+});
 ```
 to:
 ```JS
-router.get('/:id/edit', isLoggedIn, asyncErrorHandler(isAuthor), postEdit);
+/* PUT /profile */
+router.put('/profile',
+	isLoggedIn,
+	asyncErrorHandler(isValidPassword),
+	asyncErrorHandler(changePassword),
+	asyncErrorHandler(updateProfile)
+);
 ```
-
-Change:
-```JS
-router.put('/:id', upload.array('images', 4), asyncErrorHandler(postUpdate));
-```
-to:
-```JS
-router.put('/:id', isLoggedIn, asyncErrorHandler(isAuthor), upload.array('images', 4), asyncErrorHandler(postUpdate));
-```
-
-Change:
-```JS
-router.delete('/:id', asyncErrorHandler(postDestroy));
-```
-to:
-```JS
-router.delete('/:id', isLoggedIn, asyncErrorHandler(isAuthor), asyncErrorHandler(postDestroy));
-```
-
-## Update GET '/login' route's getLogin method so that logged in users are redirected to the home page
-
-### File: /controllers/index.js
-
-Change:
-```JS
-getLogin(req, res, next) {
-  res.render('login', { title: 'Login' });
-},
-```
-to:
-```JS
-getLogin(req, res, next) {
-  if (req.isAuthenticated()) return res.redirect('/');
-  res.render('login', { title: 'Login' });
-},
-```
-
-## Hide edit and delete buttons from users who are not author of post
-
-### File: /views/posts/show.ejs
-
-Change:
-```HTML
-<div>
-	<a href="/posts/<%= post.id %>/edit">
-		<button>Edit</button>
-	</a>
-</div>
-<div>
-	<form action="/posts/<%= post.id %>?_method=DELETE" method="POST">
-		<input type="submit" value="Delete">
-	</form>
-</div>
-```
-to:
-```HTML
-<% if (currentUser && post.author.equals(currentUser._id)) { %>
-<div>
-	<a href="/posts/<%= post.id %>/edit">
-		<button>Edit</button>
-	</a>
-</div>
-<div>
-	<form action="/posts/<%= post.id %>?_method=DELETE" method="POST">
-		<input type="submit" value="Delete">
-	</form>
-</div>
-<% } %>
-```
-
-## Testing it all out
-
-- Log in and create a new post then ensure that you can edit and delete it
-- Try to visit edit route for an existing post that you did not create (while logged out and while logged in)
-- Try to send delete request a post that you didn't create with curl e.g., `curl -X "DELETE" http://localhost:3000/posts/5c48b91de3c8f61bed99cb76` then check on the post to see if it was deleted
