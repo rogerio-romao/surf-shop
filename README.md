@@ -1,307 +1,447 @@
-# User Profile Pt. 2 - 4
+# Search and Filter
 
-## Update flash messages partial
+## Important note, please read:
+I'm using a new format for the follow along. It will resemble what you see when using a [git diff](https://git-scm.com/docs/git-diff) command.
 
-### File: /views/partials/flash-messages.ejs
-
-Change:
-```HTML
-<% if(success && success.length) { %>
-	<h1 style="color: green;"><%= success %></h1>
-<% } %>
-
-<% if(error && error.length) { %>
-	<h1 style="color: red;"><%= error %></h1>
-<% } %>
+For example,
+```DIFF
+const leaveMeAlone = require('leave-me-alone');
+-const removeMe = require('remove-me');
++const addMe = require('add-me');
 ```
-to:
-```HTML
-<% if(success && success.length) { %>
-	<h1 class="color-green"><%= success %></h1>
-<% } %>
+The above example means you should find the first line in your code, then remove the line with the minus - sign before it and add the line with the plus + sign before it.
 
-<% if(error && error.length) { %>
-	<h1 class="color-red"><%= error %></h1>
-<% } %>
-```
+If you have any questions about this new format, please ask them in the [course Discord server](https://discord.gg/QH4qbW7)
 
-## Add classes to main stylesheet
+## Summary of added (A) and modified (M) files:
 
-### File: /public/stylesheets/style.css
+- (M) models/post.js
+- (M) seeds.js
+- (M) views/layouts/boilerplate.ejs
+- (M) views/partials/paginatePosts.ejs
+- (A) views/partials/searchFilter.ejs
+- (M) views/posts/index.ejs
+- (M) controllers/posts.js
+- (M) middleware/index.js
+- (M) routes/posts.js
+- (A) public/javascripts/post-index.js
 
-Add:
-```CSS
-.color-red {
-	color: red;
+## Models
+
+### File: /models/post.js
+
+```DIFF
+ PostSchema.plugin(mongoosePaginate);
+ 
++PostSchema.index({ geometry: '2dsphere' });
+
+ module.exports = mongoose.model('Post', PostSchema);
+````
+
+## Seeds
+
+### File: /seeds.js
+
+```DIFF
+async function seedPosts() {
+-	await Post.remove({});
++	await Post.deleteMany({});
+	for(const i of new Array(600)) {
+		const random1000 = Math.floor(Math.random() * 1000);
++		const random5 = Math.floor(Math.random() * 6);
+		const title = faker.lorem.word();
+		const description = faker.lorem.text();
+		const postData = {
+			title,
+			description,
+			location: `${cities[random1000].city}, ${cities[random1000].state}`,
+			geometry: {
+				type: 'Point',
+				coordinates: [cities[random1000].longitude, cities[random1000].latitude],
+			},
++			price: random1000,
++			avgRating: random5,
+			author: '5bb27cd1f986d278582aa58c'
+		}
+		let post = new Post(postData);
+		post.properties.description = `<strong><a href="/posts/${post._id}">${title}</a></strong><p>${post.location}</p><p>${description.substring(0, 20)}...</p>`;
+		post.save();
+	}
+	console.log('600 new posts created');
 }
-.color-green {
-	color: green;
-}
-```
-## Add profile link to navbar
+````
 
-### File: /views/partials/navbar.ejs
-
-Change:
-```HTML
-<ul>
-	<li><a href="/">Home</a></li>
-	<li><a href="/posts">Posts</a></li>
-	<% if(!currentUser) { %>
-	<li><a href="/register">Register</a></li>
-	<li><a href="/login">Login</a></li>
-	<% } else { %>
-	<li><a href="/posts/new">New Post</a></li>
-	<li><a href="/logout">Logout</a></li>
-	Welcome, <%= currentUser.username %>!
-	<% } %>
-</ul>
+Now go to /app.js and uncomment the following lines:
+```JS
+// const seedPosts = require('./seeds');
+// seedPosts();
 ```
-to:
-```HTML
-<ul id="navbar">
-	<li><a href="/">Home</a></li>
-	<li><a href="/posts">Posts</a></li>
-	<% if(!currentUser) { %>
-	<li><a href="/register">Register</a></li>
-	<li><a href="/login">Login</a></li>
-	<% } else { %>
-	<li><a href="/posts/new">New Post</a></li>
-	<li><a href="/profile">Profile</a></li>
-	<li><a href="/logout">Logout</a></li>
-	Welcome, <%= currentUser.username %>!
-	<% } %>
-</ul>
+Save the file and run the server one time with `node app.js`, then comment those lines back out.
+
+## Views
+
+### File: views/layouts/boilerplate.ejs
+
+```DIFF
+<!DOCTYPE html>
+<html>
+ <head>
+   <title><%= title %></title>
++  <!-- Include BS4 CDN for development purposes -->
++  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+   <link rel='stylesheet' href='/stylesheets/style.css' />
+   <link rel='stylesheet' href='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v2.3.0/mapbox-gl-geocoder.css' type='text/css' />
+   <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.51.0/mapbox-gl.css' rel='stylesheet' />
+   <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.51.0/mapbox-gl.js'></script>
+   <script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v2.3.0/mapbox-gl-geocoder.min.js'></script>
+ </head>
+ <body>
+ 	<% include ../partials/navbar %>
+ 	<% include ../partials/flash-messages %>
+ 	<%- body -%>
+ </body>
++<% if (title === 'Posts Index') { %>
++<script src="/javascripts/post-index.js"></script>
++<% } %>
+</html> 
 ```
 
-## Add update form to profile
+### File: views/partials/paginatePosts.ejs
 
-### File: /views/profile.ejs
+```DIFF
+ <div style="margin: 20px 0;">
+ <% if(posts.page - 1) { %>
+-       <a href="/posts?page=<%= posts.page - 1 %>">Prev</a>
++       <a href="<%= paginateUrl %><%= posts.page - 1 %>">Prev</a>
+ <% } %>
++<% if(posts.pages > 1 && posts.docs.length) { %>
+ <% for(let i = 1; i <= posts.pages; i++) { %>
+-       <a href="/posts?page=<%= i %>"
++       <a href="<%= paginateUrl %><%= i %>"
+		 <%= i === posts.page ? 'style=color:#000;' : '' %>
+		><%= i %></a>
+ <% } %>
++<% } %>
+ <% if((posts.page + 1) <= posts.pages) { %>
+-       <a href="/posts?page=<%= posts.page + 1 %>">Next</a>
++       <a href="<%= paginateUrl %><%= posts.page + 1 %>">Next</a>
+ <% } %>
+ </div>
+```
 
-Add the following code to the bottom of the file:
+### File: views/partials/searchFilter.ejs
+
+Create a new file in /views/partials and name it searchFilter.ejs then add the following markup:
+
 ```HTML
-<p>Update Info:</p>
+<form action="/posts" method="GET">
+	<fieldset>
+		<legend>Search</legend>
+		<label for="search">Search</label>
+		<input type="text" placeholder="Search" name="search" id="seach" value="<%= query.search %>">
+	</fieldset>
 
-<form action="/profile?_method=PUT" method="POST" id="update-profile">
+	<fieldset>
 	<div>
-		<label for="username">Username:</label>
-		<input type="text" id="username" name="username" placeholder="username" value="<%= currentUser.username %>" autofocus required>
-	</div>
-	<div>
-		<label for="current-password">Current Password (required to update profile):</label>
-		<input type="password" id="current-password" name="currentPassword" placeholder="current password" required>
-	</div>
-	<div>
-		<label for="new-password">New Password:</label>
-		<input type="password" id="new-password" name="newPassword" placeholder="new password">
-	</div>
-	<div>
-		<label for="password-confirmation">New Password Confirmation:</label>
-		<input type="password" id="password-confirmation" name="passwordConfirmation" placeholder="password confirmation">
-	</div>
-	<div id="validation-message"></div>
-	<div>
-		<label for="email">Email:</label>
-		<input type="email" id="email" name="email" placeholder="email" value="<%= currentUser.email %>" required>
-	</div>
-	<div>
-		<label for="image">Image:</label>
-		<input type="file" id="image" name="image">
-	</div>
+  	<label for="location">Location</label>
+  	<input type="text" id="location" name="location" placeholder="Address or Zipcode" value="<%= query.location %>">
+  	<small><a href="#" id="use-my-location">use my location</a></small>
+  </div>
+		<legend>Distance (miles)</legend>
+  	<div>
+	    <input type="radio" name="distance" id="distance25" value="25" <%= query.distance === '25' ? 'checked' : '' %>>
+  	  <label for="distance25">25</label>
+  	</div>
+  	<div>
+	    <input type="radio" name="distance" id="distance50" value="50" <%= query.distance === '50' ? 'checked' : '' %>>
+  	  <label for="distance50">50</label>
+  	</div>
+  	<div>
+	    <input type="radio" name="distance" id="distance100" value="100" <%= query.distance === '100' ? 'checked' : '' %>>
+		  <label for="distance100">100</label>
+  	</div>
+  	<div>
+  		<a href="#" id="clear-distance">clear</a>
+  	</div>
+	</fieldset>
 
+	<fieldset>
+		<legend>Price</legend>
+		<label for="min">Min</label>
+		<input type="number" id="min" name="price[min]" min="0" max="10000" step="1" placeholder="Min" value="<%= query.price ? query.price.min : '' %>">
+
+		<label for="max">Max</label>
+		<input type="number" id="max" name="price[max]" min="0" max="10000" step="1" step="1" placeholder="Max" value="<%= query.price ? query.price.max : '' %>">
+	</fieldset>
+
+	<fieldset>
+		<legend>Rating</legend>
+		<input type="checkbox" id="zero-stars" name="avgRating[]" value="0" <%= query.avgRating && query.avgRating.includes('0') ? 'checked' : '' %>>
+		<label for="zero-stars">0 stars</label><br>
+		<input type="checkbox" id="one-star" name="avgRating[]" value="1" <%= query.avgRating && query.avgRating.includes('1') ? 'checked' : '' %>>
+		<label for="one-star">1 star</label><br>
+		<input type="checkbox" id="two-stars" name="avgRating[]" value="2" <%= query.avgRating && query.avgRating.includes('2') ? 'checked' : '' %>>
+		<label for="two-stars">2 stars</label><br>
+		<input type="checkbox" id="three-stars" name="avgRating[]" value="3" <%= query.avgRating && query.avgRating.includes('3') ? 'checked' : '' %>>
+		<label for="three-stars">3 stars</label><br>
+		<input type="checkbox" id="four-stars" name="avgRating[]" value="4" <%= query.avgRating && query.avgRating.includes('4') ? 'checked' : '' %>>
+		<label for="four-stars">4 stars</label><br>
+		<input type="checkbox" id="five-stars" name="avgRating[]" value="5" <%= query.avgRating && query.avgRating.includes('5') ? 'checked' : '' %>>
+		<label for="five-stars">5 stars</label>
+	</fieldset>
+	<div>
+		<a href="/posts">reset form</a>
+	</div>
+	
 	<input type="submit">
 </form>
-
-<script src="/javascripts/profile.js"></script>
 ```
 
-## Create profile.js file
+### File: views/posts/index.ejs
 
-### Create a file named profile.js inside of /public/javascripts
+```DIFF
+ <% layout('layouts/boilerplate') -%>
+ <h1>Posts Index!</h1>
+-<div id="map"></div>
 
-Add:
-```JS
-let newPasswordValue;
-let confirmationValue;
-const form = document.querySelector('form');
-const newPassword = document.getElementById('new-password');
-const confirmation = document.getElementById('password-confirmation');
-const validationMessage = document.getElementById('validation-message');
-function validatePasswords(message, add, remove) {
-		validationMessage.textContent = message;
-		validationMessage.classList.add(add);
-		validationMessage.classList.remove(remove);
-}
-confirmation.addEventListener('input', e => {
-	e.preventDefault();
-	newPasswordValue = newPassword.value;
-	confirmationValue = confirmation.value;
-	if (newPasswordValue !== confirmationValue) {
-	  validatePasswords('Passwords must match!', 'color-red', 'color-green');
-	} else {
-		validatePasswords('Passwords match!', 'color-green', 'color-red');
-	}
-});
++<div class="container-fluid">
++       <div class="row">
++               <div class="col-4">
++                       <% include ../partials/searchFilter %>
++               </div>
++               <div class="col-8">
++                       <div id="map"></div>
++               </div>
++       </div>
++</div>
+ 
+ <% include ../partials/paginatePosts %>
+```
 
-form.addEventListener('submit', e => {
-	if (newPasswordValue !== confirmationValue) { 
-		e.preventDefault();
-		const error = document.getElementById('error');
-		if(!error) {
-			const flashErrorH1 = document.createElement('h1');
-			flashErrorH1.classList.add('color-red');
-			flashErrorH1.setAttribute('id', 'error');
-			flashErrorH1.textContent = 'Passwords must match!';
-			const navbar = document.getElementById('navbar');
-			navbar.parentNode.insertBefore(flashErrorH1, navbar.nextSibling);
+## Controllers
+
+### File: /controllers/posts.js
+
+```DIFF
+// Posts Index
+async postIndex(req, res, next) {
+-	let posts = await Post.paginate({}, {
++	const { dbQuery } = res.locals;
++	delete res.locals.dbQuery;
++	let posts = await Post.paginate(dbQuery, {
+		page: req.query.page || 1,
+		limit: 10,
+		sort: '-_id'
+	});
+	posts.page = Number(posts.page);
++	if (!posts.docs.length && res.locals.query) {
++		res.locals.error = 'No results match that query.';
++	}
+	res.render('posts/index', { 
+		posts, 
+		mapBoxToken, 
+		title: 'Posts Index'
+	});
+},
+```
+
+```DIFF
+// Posts Show
+async postShow(req, res, next) {
+	let post = await Post.findById(req.params.id).populate({
+		path: 'reviews',
+		options: { sort: { '_id': -1 } },
+		populate: {
+			path: 'author',
+			model: 'User'
 		}
-	}
-});
+	});
+-	const floorRating = post.calculateAvgRating();
++	// const floorRating = post.calculateAvgRating();
++	const floorRating = post.avgRating;
+	res.render('posts/show', { post, mapBoxToken, floorRating });
+},
 ```
 
-## Add isValidPassword and changePassword middleware
+## Middleware
 
 ### File: /middleware/index.js
 
-Add the following code to the bottom of the module.exports object after the isAuthor method:
+```DIFF
+ const Review = require('../models/review');
+ const User = require('../models/user');
+ const Post = require('../models/post');
+ const { cloudinary } = require('../cloudinary');
++const mbxGeocoding = require('@mapbox/mapbox-sdk/services/geocoding');
++const mapBoxToken = process.env.MAPBOX_TOKEN;
++const geocodingClient = mbxGeocoding({ accessToken: mapBoxToken });
++
++function escapeRegExp(str) {
++  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
++}
+```
+Add a new async method to the bottom of module.exports and name it searchAndFilterPosts, then add the following code:
+
 ```JS
-,
-	isValidPassword: async (req, res, next) => {
-		const { user } = await User.authenticate()(req.user.username, req.body.currentPassword)
-		if(user) { 
-			// add user to res.locals
-			res.locals.user = user;
-			// go to next middleware
-			next();
-		} else {
-			// flash an error
-			req.session.error = 'Incorrect Current Password!';
-			// short circuit the route middleware and redirect to /profile
-			return res.redirect('/profile');
+// create a async middleware method named searchAndFilterPosts
+async searchAndFilterPosts(req, res, next) {
+	// pull keys from req.query (if there are any) and assign them 
+	// to queryKeys variable as an array of string values
+	const queryKeys = Object.keys(req.query);
+	/* 
+		check if queryKeys array has any values in it
+		if true then we know that req.query has properties
+		which means the user:
+		a) clicked a paginate button (page number)
+		b) submitted the search/filter form
+		c) both a and b
+	*/
+	if (queryKeys.length) {
+		// initialize an empty array to store our db queries (objects) in
+		const dbQueries = [];
+		// destructure all potential properties from req.query
+		let { search, price, avgRating, location, distance  } = req.query;
+		// check if search exists, if it does then we know that the user
+		// submitted the search/filter form with a search query
+		if (search) {
+			// convert search to a regular expression and 
+			// escape any special characters
+			search = new RegExp(escapeRegExp(search), 'gi');
+			// create a db query object and push it into the dbQueries array
+			// now the database will know to search the title, description, and location
+			// fields, using the search regular expression
+			dbQueries.push({ $or: [
+				{ title: search },
+				{ description: search },
+				{ location: search }
+			]});
 		}
-	},
-	changePassword: async (req, res, next) => {
-		// destructure new password values from req.body object
-		const { 
-			newPassword,
-			passwordConfirmation
-		} = req.body;
-
-		// check if new password values exist
-		if (newPassword && passwordConfirmation) {
-			// destructure user from res.locals
-			const { user } = res.locals;
-				// check if new passwords match
-				if (newPassword === passwordConfirmation) {
-					// set new password on user object
-					await user.setPassword(newPassword);
-					// go to next middleware
-					next();
-				} else {
-					// flash error
-					req.session.error = 'New passwords must match!';
-					// short circuit the route middleware and redirect to /profile
-					return res.redirect('/profile');
-				}
-		} else {
-			// go to next middleware
-			next();
+		// check if location exists, if it does then we know that the user
+		// submitted the search/filter form with a location query
+		if (location) {
+			// geocode the location to extract geo-coordinates (lat, lng)
+			const response = await geocodingClient
+			  .forwardGeocode({
+			    query: location,
+			    limit: 1
+			  })
+			  .send();
+			// destructure coordinates [ <longitude> , <latitude> ]
+			const { coordinates } = response.body.features[0].geometry;
+			// get the max distance or set it to 25 mi
+			let maxDistance = distance || 25;
+			// we need to convert the distance to meters, one mile is approximately 1609.34 meters
+			maxDistance *= 1609.34;
+			// create a db query object for proximity searching via location (geometry)
+			// and push it into the dbQueries array
+			dbQueries.push({
+			  geometry: {
+			    $near: {
+			      $geometry: {
+			        type: 'Point',
+			        coordinates
+			      },
+			      $maxDistance: maxDistance
+			    }
+			  }
+			});
 		}
+		// check if price exists, if it does then we know that the user
+		// submitted the search/filter form with a price query (min, max, or both)
+		if (price) {
+			/*
+				check individual min/max values and create a db query object for each
+				then push the object into the dbQueries array
+				min will search for all post documents with price
+				greater than or equal to ($gte) the min value
+				max will search for all post documents with price
+				less than or equal to ($lte) the min value
+			*/
+			if (price.min) dbQueries.push({ price: { $gte: price.min } });
+			if (price.max) dbQueries.push({ price: { $lte: price.max } });
+		}
+		// check if avgRating exists, if it does then we know that the user
+		// submitted the search/filter form with a avgRating query (0 - 5 stars)
+		if (avgRating) {
+			// create a db query object that finds any post documents where the avgRating
+			// value is included in the avgRating array (e.g., [0, 1, 2, 3, 4, 5])
+			dbQueries.push({ avgRating: { $in: avgRating } });
+		}
+
+		// pass database query to next middleware in route's middleware chain
+		// which is the postIndex method from /controllers/postsController.js
+		res.locals.dbQuery = dbQueries.length ? { $and: dbQueries } : {};
 	}
+	// pass req.query to the view as a local variable to be used in the searchAndFilter.ejs partial
+	// this allows us to maintain the state of the searchAndFilter form
+	res.locals.query = req.query;
+
+	// build the paginateUrl for paginatePosts partial
+	// first remove 'page' string value from queryKeys array, if it exists
+	queryKeys.splice(queryKeys.indexOf('page'), 1);
+	/*
+		now check if queryKeys has any other values, if it does then we know the user submitted the search/filter form
+		if it doesn't then they are on /posts or a specific page from /posts, e.g., /posts?page=2
+		we assign the delimiter based on whether or not the user submitted the search/filter form
+		e.g., if they submitted the search/filter form then we want page=N to come at the end of the query string
+		e.g., /posts?search=surfboard&page=N
+		but if they didn't submit the search/filter form then we want it to be the first (and only) value in the query string,
+		which would mean it needs a ? delimiter/prefix
+		e.g., /posts?page=N
+		*N represents a whole number greater than 0, e.g., 1
+	*/
+	const delimiter = queryKeys.length ? '&' : '?';
+	// build the paginateUrl local variable to be used in the paginatePosts.ejs partial
+	// do this by taking the originalUrl and replacing any match of ?page=N or &page=N with an empty string
+	// then append the proper delimiter and page= to the end
+	// the actual page number gets assigned in the paginatePosts.ejs partial
+	res.locals.paginateUrl = req.originalUrl.replace(/(\?|\&)page=\d+/g, '') + `${delimiter}page=`;
+	// move to the next middleware (postIndex method)
+	next();
+}
+``` 
+
+*\*Don't forget the comma after the deleteProfileImage method*
+
+## Routes
+
+### File: /routes/posts.js
+
+```DIFF
+ const router = express.Router();
+ const multer = require('multer');
+ const { storage } = require('../cloudinary');
+ const upload = multer({ storage });
+-const { asyncErrorHandler, isLoggedIn, isAuthor } = require('../middleware');
++const {
++	asyncErrorHandler,
++	isLoggedIn,
++	isAuthor,
++	searchAndFilterPosts
++} = require('../middleware');
 ```
 
-## Add updateProfile method to index controller
-
-### File: /controllers/index.js
-
-Add the following code to the top of the file after the existing require() statements:
-```JS
-const util = require('util');
+```DIFF
+ /* GET posts index /posts */
+-router.get('/', asyncErrorHandler(postIndex));
++router.get(
++	'/',
++	asyncErrorHandler(searchAndFilterPosts),
++	asyncErrorHandler(postIndex)
++);
 ```
 
-Add the following code after the getProfile method:
-```JS
-,
-	async updateProfile(req, res, next) {
-		// destructure username and email from req.body
-		const {
-			username,
-			email
-		} = req.body;
-		// destructure user object from res.locals
-		const { user } = res.locals;
-		// check if username or email need to be updated
-		if (username) user.username = username;
-		if (email) user.email = email;
-		// save the updated user to the database
-		await user.save();
-		// promsify req.login
-		const login = util.promisify(req.login.bind(req));
-		// log the user back in with new info
-		await login(user);
-		// redirect to /profile with a success flash message
-		req.session.success = 'Profile successfully updated!';
-		res.redirect('/profile');
-	}
-```
+## Public
 
-## Update Routes
+### File: /public/javascripts/post-index.js
 
-### /routes/index.js
+Create a new file inside of /public/javascripts and name it post-index.js then add the following code:
 
-Change:
 ```JS
-const { 
-	landingPage,
-	getRegister,
-	postRegister,
-	getLogin,
-	postLogin,
-	getLogout,
-	getProfile
-} = require('../controllers');
-```
-to:
-```JS
-const { 
-	landingPage,
-	getRegister,
-	postRegister,
-	getLogin,
-	postLogin,
-	getLogout,
-	getProfile,
-	updateProfile
-} = require('../controllers');
-```
-Change:
-```JS
-const { asyncErrorHandler, isLoggedIn } = require('../middleware');
-```
-to:
-```JS
-const { 
-	asyncErrorHandler,
-	isLoggedIn,
-	isValidPassword,
-	changePassword
-} = require('../middleware');
-```
-
-Change:
-```JS
-/* PUT /profile/:user_id */
-router.put('/profile/:user_id', (req, res, next) => {
-  res.send('PUT /profile/:user_id');
+const clear = document.getElementById('clear-distance');
+clear.addEventListener('click', (e) => {
+       e.preventDefault();
+       document.getElementById('location').value = '';
+       document.querySelector('input[type=radio]:checked').checked = false;
 });
-```
-to:
-```JS
-/* PUT /profile */
-router.put('/profile',
-	isLoggedIn,
-	asyncErrorHandler(isValidPassword),
-	asyncErrorHandler(changePassword),
-	asyncErrorHandler(updateProfile)
-);
 ```

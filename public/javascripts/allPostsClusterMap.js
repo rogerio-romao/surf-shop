@@ -6,7 +6,7 @@ var map = new mapboxgl.Map({
 });
 
 map.addControl(new MapboxGeocoder({
-    accessToken: mapboxgl.accessToken
+    accessToken: mapboxgl.accessToken,
 }));
 
 map.on('load', function() {
