@@ -6,7 +6,7 @@
     "start": "node ./bin/www"
   },
   "dependencies": {
-    "@mapbox/mapbox-sdk": "^0.9.0",
+    "@mapbox/mapbox-sdk": "^0.14.0",
     "@sendgrid/mail": "^6.5.3",
     "body-parser": "^1.19.0",
     "cloudinary": "^1.19.0",
