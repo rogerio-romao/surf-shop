@@ -7,7 +7,7 @@
   },
   "dependencies": {
     "@mapbox/mapbox-sdk": "^0.15.0",
-    "@sendgrid/mail": "^7.7.0",
+    "@sendgrid/mail": "^8.0.0",
     "body-parser": "^1.20.2",
     "cloudinary": "^1.19.0",
     "cookie-parser": "~1.4.4",
